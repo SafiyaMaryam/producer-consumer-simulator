@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Producer-Consumer Problem Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="dark"]{
+  --bg:#0d0f11;--surface:#141618;--surface2:#191b1e;--surface3:#1e2124;
+  --sdyn:#252830;--divider:#2a2d32;--border:#323640;
+  --text:#e2e4e8;--muted:#7a8090;--faint:#4a4f5a;--inv:#0d0f11;
+  --primary:#00c4cc;--ph:#00a8b0;--pa:#008a91;--phi:#0e2a2c;
+  --green:#4ade80;--greendim:rgba(74,222,128,0.08);
+  --orange:#f97316;--orangedim:rgba(249,115,22,0.08);
+  --purple:#a78bfa;--purpledim:rgba(167,139,250,0.10);
+  --yellow:#fbbf24;--red:#f87171;--teal:#34d399;
+  --item:#38bdf8;
+  --r-sm:.375rem;--r-md:.5rem;--r-lg:.75rem;--r-xl:1rem;--r-full:9999px;
+  --tr:180ms cubic-bezier(.16,1,.3,1);
+  --sh-sm:0 1px 2px rgba(0,0,0,.3);--sh-md:0 4px 12px rgba(0,0,0,.4);--sh-lg:0 12px 32px rgba(0,0,0,.5);
+  --xs:clamp(.75rem,.7rem + .25vw,.875rem);--sm:clamp(.875rem,.8rem + .35vw,1rem);
+  --base:clamp(1rem,.95rem + .25vw,1.125rem);--lg:clamp(1.125rem,1rem + .75vw,1.5rem);
+  --xl:clamp(1.5rem,1.2rem + 1.25vw,2.25rem);
+  --font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono','Fira Code',monospace;
+}
+[data-theme="light"]{
+  --bg:#f0f2f5;--surface:#fff;--surface2:#f8fafb;--surface3:#edf0f3;
+  --sdyn:#e2e6eb;--divider:#d8dce2;--border:#c8cdd6;
+  --text:#1a1e28;--muted:#5a6272;--faint:#9aa0ae;--inv:#f0f2f5;
+  --primary:#007a82;--ph:#006168;--pa:#004d52;--phi:#d0edf0;
+  --green:#16a34a;--greendim:#dcfce7;
+  --orange:#ea580c;--orangedim:#fed7aa;
+  --purple:#7c3aed;--purpledim:#ede9fe;
+  --yellow:#d97706;--red:#dc2626;--teal:#059669;--item:#0284c7;
+  --sh-sm:0 1px 2px rgba(0,0,0,.06);--sh-md:0 4px 12px rgba(0,0,0,.08);--sh-lg:0 12px 32px rgba(0,0,0,.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+body{min-height:100dvh;font-family:var(--font);font-size:var(--sm);color:var(--text);background:var(--bg);overflow-x:hidden}
+
+/* HEADER */
+.hdr{display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:.6rem 1.25rem;background:var(--surface);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;box-shadow:var(--sh-md)}
+.hdr-left{display:flex;align-items:center;gap:.75rem}
+.hdr-logo{display:flex;align-items:center;gap:.5rem}
+.hdr-title{font-size:var(--sm);font-weight:700;color:var(--text);line-height:1.2}
+.hdr-sub{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.hdr-right{display:flex;align-items:center;gap:.5rem}
+.status-pill{display:flex;align-items:center;gap:.35rem;padding:.2rem .7rem;
+  border-radius:var(--r-full);font-family:var(--mono);font-size:11px;font-weight:700}
+.status-running{background:rgba(52,211,153,.15);color:var(--teal)}
+.status-paused{background:rgba(251,191,36,.15);color:var(--yellow)}
+.status-stopped{background:var(--sdyn);color:var(--muted)}
+.sdot{width:6px;height:6px;border-radius:50%;background:currentColor}
+.sdot.pulse{animation:pulse 1.4s ease infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+.icon-btn{width:34px;height:34px;border-radius:var(--r-md);background:var(--surface3);
+  border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;color:var(--muted);transition:all var(--tr)}
+.icon-btn:hover{background:var(--sdyn);color:var(--text)}
+
+/* LAYOUT */
+.main{max-width:1440px;margin:0 auto;padding:1rem 1.25rem;
+  display:grid;grid-template-columns:1fr;gap:.75rem}
+@media(min-width:1024px){.main{grid-template-columns:1fr 340px}}
+
+/* CONTROLS */
+.ctrl-bar{grid-column:1/-1;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--r-lg);padding:.75rem 1rem;
+  display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end}
+.ctrl-grp{display:flex;flex-direction:column;gap:.35rem;min-width:120px}
+.ctrl-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.ctrl-row{display:flex;align-items:center;gap:.5rem}
+input[type=range]{flex:1;height:4px;appearance:none;background:var(--sdyn);
+  border-radius:var(--r-full);cursor:pointer;outline:none}
+input[type=range]::-webkit-slider-thumb{appearance:none;width:14px;height:14px;
+  border-radius:50%;background:var(--primary);border:2px solid var(--surface);
+  cursor:pointer;box-shadow:var(--sh-sm)}
+.vbadge{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--primary);min-width:2.2ch;text-align:right}
+.ctrl-btns{display:flex;gap:.5rem;flex-wrap:wrap;margin-left:auto;align-items:flex-end}
+.btn{display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .9rem;
+  border-radius:var(--r-md);font-size:var(--xs);font-weight:600;cursor:pointer;
+  border:1px solid transparent;transition:all var(--tr);min-height:34px;white-space:nowrap}
+.btn-primary{background:var(--primary);color:var(--inv);border-color:var(--primary)}
+.btn-primary:hover{background:var(--ph);border-color:var(--ph)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:var(--surface3);color:var(--text);border-color:var(--border)}
+.btn-ghost:hover{background:var(--sdyn)}
+.btn-ghost:disabled{opacity:.4;cursor:not-allowed}
+.btn-danger{background:rgba(248,113,113,.12);color:var(--red);border-color:rgba(248,113,113,.3)}
+.btn-danger:hover{background:rgba(248,113,113,.2)}
+
+/* VIZ SECTION */
+.viz-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:.55rem 1rem;
+  border-bottom:1px solid var(--divider)}
+.sec-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.tick-count{font-family:var(--mono);font-size:10px;color:var(--faint)}
+
+/* VIZ CANVAS — 3-column grid */
+.viz-canvas{display:grid;grid-template-columns:1fr 180px 1fr;gap:.5rem;
+  padding:1rem .75rem;align-items:start;min-height:320px}
+@media(max-width:700px){.viz-canvas{grid-template-columns:1fr;padding:.75rem .5rem}}
+
+/* THREAD COLUMN LABELS */
+.col-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem}
+.col-label.p-label{color:var(--green)}
+.col-label.c-label{color:var(--orange)}
+.threads-col{display:flex;flex-direction:column;gap:.45rem}
+
+/* THREAD CARD */
+.tc{border-radius:var(--r-md);border:1px solid var(--border);background:var(--surface2);
+  padding:.6rem .75rem;display:flex;flex-direction:column;gap:.3rem;
+  transition:all 200ms ease;position:relative;overflow:hidden}
+.tc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px;transition:background 200ms}
+.tc.producer::before{background:var(--green)}
+.tc.consumer::before{background:var(--orange)}
+.tc.st-wait{background:rgba(251,191,36,.05);border-color:rgba(251,191,36,.3)}
+.tc.st-crit{background:rgba(167,139,250,.08);border-color:rgba(167,139,250,.35);
+  box-shadow:0 0 14px rgba(167,139,250,.15);animation:critpulse 1.6s ease infinite}
+.tc.st-work{background:rgba(0,196,204,.05);border-color:rgba(0,196,204,.25)}
+@keyframes critpulse{0%,100%{box-shadow:0 0 14px rgba(167,139,250,.15)}50%{box-shadow:0 0 22px rgba(167,139,250,.3)}}
+.tc-hdr{display:flex;align-items:center;justify-content:space-between}
+.tc-name{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text)}
+.tc-badge{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 6px;
+  border-radius:var(--r-full);text-transform:uppercase;letter-spacing:.05em}
+.b-idle{background:var(--sdyn);color:var(--muted)}
+.b-wsem{background:rgba(251,191,36,.2);color:var(--yellow)}
+.b-wmtx{background:rgba(167,139,250,.2);color:var(--purple)}
+.b-crit{background:rgba(167,139,250,.25);color:var(--purple)}
+.b-work{background:rgba(0,196,204,.18);color:var(--primary)}
+.b-done{background:rgba(52,211,153,.18);color:var(--teal)}
+.tc-step{font-family:var(--mono);font-size:10px;color:var(--muted);line-height:1.4}
+.tc-prog-wrap{height:2px;background:var(--sdyn);border-radius:var(--r-full);overflow:hidden}
+.tc-prog{height:100%;border-radius:var(--r-full);transition:width 300ms ease;width:0%}
+.producer .tc-prog{background:var(--green)}
+.consumer .tc-prog{background:var(--orange)}
+
+/* BUFFER CENTER */
+.buf-center{display:flex;flex-direction:column;align-items:center;gap:.5rem}
+.buf-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.buf-slots{display:flex;flex-direction:column;gap:.3rem;width:100%}
+.buf-slot{height:38px;border-radius:var(--r-md);border:1px dashed var(--border);
+  background:var(--surface2);display:flex;align-items:center;justify-content:space-between;
+  padding:0 .6rem;transition:all 200ms ease;position:relative;overflow:hidden}
+.buf-slot.filled{background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.4);border-style:solid}
+.buf-slot.added{animation:slotAdd .4s ease}
+@keyframes slotAdd{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
+.buf-slot.removed{animation:slotRm .25s ease forwards}
+@keyframes slotRm{0%{transform:scale(1)}100%{transform:scale(.8);opacity:0}}
+.slot-val{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--item)}
+.slot-idx{font-family:var(--mono);font-size:9px;color:var(--faint)}
+.slot-ptr{font-size:9px;font-family:var(--mono);display:flex;gap:.3rem}
+.ptr-in{color:var(--green)}
+.ptr-out{color:var(--orange)}
+
+/* SEMAPHORE PANEL */
+.sem-panel{display:flex;flex-direction:column;gap:.4rem;width:100%;margin-top:.25rem}
+.sem-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:.5rem .65rem;display:flex;flex-direction:column;gap:.3rem}
+.sem-hdr{display:flex;align-items:center;justify-content:space-between}
+.sem-name{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text);
+  display:flex;align-items:center;gap:.35rem}
+.sdot8{width:8px;height:8px;border-radius:50%}
+.sem-val{font-family:var(--mono);font-size:var(--lg);font-weight:800;line-height:1;transition:color 300ms}
+.sem-track{height:3px;background:var(--sdyn);border-radius:var(--r-full);overflow:hidden}
+.sem-fill{height:100%;border-radius:var(--r-full);transition:width 300ms ease}
+.sem-desc{font-size:9px;color:var(--faint);font-family:var(--mono)}
+
+/* MUTEX */
+.mtx-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);
+  padding:.5rem .65rem;display:flex;align-items:center;gap:.6rem;transition:all 200ms}
+.mtx-card.locked{background:rgba(167,139,250,.08);border-color:rgba(167,139,250,.35)}
+.mtx-icon{width:34px;height:34px;border-radius:var(--r-md);background:var(--sdyn);
+  display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;
+  transition:all 200ms}
+.mtx-card.locked .mtx-icon{background:rgba(167,139,250,.2)}
+.mtx-info{flex:1;min-width:0}
+.mtx-name{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--text)}
+.mtx-status{font-family:var(--mono);font-size:9px;font-weight:700;margin-top:1px}
+.mtx-status.locked{color:var(--purple)}
+.mtx-status.unlocked{color:var(--teal)}
+.mtx-holder{font-size:9px;color:var(--muted);font-family:var(--mono);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* DEADLOCK ALERT */
+.dlock{display:none;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);
+  border-radius:var(--r-md);padding:.5rem 1rem;margin:.5rem 1rem;
+  font-family:var(--mono);font-size:11px;color:var(--red);text-align:center}
+.dlock.show{display:block}
+
+/* RIGHT SIDEBAR */
+.sidebar{display:flex;flex-direction:column;gap:.75rem}
+@media(min-width:1024px){.sidebar{grid-column:2}}
+
+/* CARD */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:.5rem .9rem;border-bottom:1px solid var(--divider)}
+.card-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.clear-btn{font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;
+  font-family:var(--mono);transition:color var(--tr)}
+.clear-btn:hover{color:var(--text)}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;padding:.75rem .9rem}
+.stat-item{display:flex;flex-direction:column;gap:.2rem}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.stat-val{font-family:var(--mono);font-size:var(--lg);font-weight:800;color:var(--text);transition:color 300ms}
+.sv-p{color:var(--green)}.sv-c{color:var(--orange)}
+
+/* LOG */
+.log-body{max-height:220px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.log-entry{display:grid;grid-template-columns:4.5ch 2.5ch 1fr;gap:.4rem;
+  padding:.3rem .9rem;border-bottom:1px solid var(--divider);
+  font-family:var(--mono);font-size:10px;line-height:1.5;
+  animation:logIn .2s ease;transition:background 150ms}
+.log-entry:hover{background:var(--surface2)}
+.log-entry:last-child{border-bottom:none}
+@keyframes logIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+.lt{color:var(--faint)}.la{font-weight:700}.la.lp{color:var(--green)}.la.lc{color:var(--orange)}.la.ls{color:var(--muted)}
+.lm{color:var(--muted)}.lm .hi{color:var(--text)}.lm .v{color:var(--primary)}
+
+/* ALGO */
+.algo-wrap{padding:.75rem .9rem;display:flex;flex-direction:column;gap:.6rem}
+.algo-block{border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden}
+.algo-title{padding:.3rem .65rem;font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.07em;border-bottom:1px solid var(--divider)}
+.algo-title.p{color:var(--green);background:var(--greendim)}
+.algo-title.c{color:var(--orange);background:var(--orangedim)}
+.algo-code{padding:.5rem .65rem;font-family:var(--mono);font-size:10px;line-height:1.9;color:var(--muted)}
+.al{padding:1px .35rem;border-radius:3px;transition:all 180ms}
+.al.active{background:rgba(0,196,204,.15);color:var(--primary)}
+.kw{color:var(--purple)}.fn{color:var(--primary)}.cm{color:var(--faint)}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+
+@media(max-width:700px){
+  .ctrl-bar{flex-direction:column;align-items:stretch}
+  .ctrl-btns{margin-left:0}
+  .main{padding:.75rem .75rem;gap:.6rem}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-left">
+    <div class="hdr-logo">
+      <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="logo">
+        <circle cx="6" cy="15" r="4.5" stroke="#4ade80" stroke-width="1.4" fill="none"/>
+        <circle cx="6" cy="15" r="1.8" fill="#4ade80"/>
+        <rect x="12" y="11" width="6" height="8" rx=".9" stroke="#00c4cc" stroke-width="1.3" fill="none"/>
+        <rect x="13.2" y="12.3" width="3.6" height="1.8" rx=".4" fill="#00c4cc" opacity=".8"/>
+        <rect x="13.2" y="15.3" width="3.6" height="1.8" rx=".4" fill="#00c4cc" opacity=".3"/>
+        <circle cx="24" cy="15" r="4.5" stroke="#f97316" stroke-width="1.4" fill="none"/>
+        <circle cx="24" cy="15" r="1.8" fill="#f97316"/>
+        <path d="M11 14.5l.8.5-.8.5" stroke="#00c4cc" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+        <path d="M19 14.5l.8.5-.8.5" stroke="#00c4cc" stroke-width="1.1" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="hdr-title">Producer-Consumer Simulator</div>
+      <div class="hdr-sub">semaphores · mutex locks · OS synchronization</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="status-pill status-stopped" id="statusPill">
+      <div class="sdot" id="sdot"></div>
+      <span id="statusTxt">STOPPED</span>
+    </div>
+    <button class="icon-btn" data-theme-toggle aria-label="Toggle theme">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="main">
+
+<!-- CONTROLS -->
+<div class="ctrl-bar" style="grid-column:1/-1">
+  <div class="ctrl-grp">
+    <div class="ctrl-lbl">Producers</div>
+    <div class="ctrl-row">
+      <input type="range" id="nP" min="1" max="4" value="2" step="1">
+      <span class="vbadge" id="nPv">2</span>
+    </div>
+  </div>
+  <div class="ctrl-grp">
+    <div class="ctrl-lbl">Consumers</div>
+    <div class="ctrl-row">
+      <input type="range" id="nC" min="1" max="4" value="2" step="1">
+      <span class="vbadge" id="nCv">2</span>
+    </div>
+  </div>
+  <div class="ctrl-grp">
+    <div class="ctrl-lbl">Buffer Size</div>
+    <div class="ctrl-row">
+      <input type="range" id="bSz" min="2" max="8" value="4" step="1">
+      <span class="vbadge" id="bSzv">4</span>
+    </div>
+  </div>
+  <div class="ctrl-grp">
+    <div class="ctrl-lbl">Speed</div>
+    <div class="ctrl-row">
+      <input type="range" id="spd" min="1" max="5" value="3" step="1">
+      <span class="vbadge" id="spdv">3×</span>
+    </div>
+  </div>
+  <div class="ctrl-btns">
+    <button class="btn btn-primary" id="btnStart" onclick="startSim()">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>Start
+    </button>
+    <button class="btn btn-ghost" id="btnPause" onclick="togglePause()" disabled>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause
+    </button>
+    <button class="btn btn-danger" onclick="resetSim()">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>Reset
+    </button>
+  </div>
+</div>
+
+<!-- LEFT: VIZ -->
+<div class="viz-wrap">
+  <div class="sec-hdr">
+    <span class="sec-title">Live Simulation</span>
+    <span class="tick-count">Tick: <span id="tickCount">0</span></span>
+  </div>
+
+  <div class="viz-canvas" id="vizCanvas">
+    <!-- PRODUCERS -->
+    <div class="threads-col" id="pCol">
+      <div class="col-label p-label">Producers</div>
+    </div>
+
+    <!-- BUFFER + SEMAPHORES -->
+    <div class="buf-center">
+      <div class="buf-label">Bounded Buffer</div>
+      <div class="buf-slots" id="bufSlots"></div>
+      <div class="slot-ptr" id="ptrs" style="width:100%;justify-content:space-between;margin-top:.1rem">
+        <span class="ptr-in">in→0</span><span class="ptr-out">out→0</span>
+      </div>
+      <div class="sem-panel">
+        <div class="sem-card">
+          <div class="sem-hdr">
+            <div class="sem-name"><div class="sdot8" style="background:var(--green)"></div>sem_empty</div>
+            <div class="sem-val" id="svEmpty" style="color:var(--green)">4</div>
+          </div>
+          <div class="sem-track"><div class="sem-fill" id="sfEmpty" style="background:var(--green);width:100%"></div></div>
+          <div class="sem-desc">empty slots available</div>
+        </div>
+        <div class="sem-card">
+          <div class="sem-hdr">
+            <div class="sem-name"><div class="sdot8" style="background:var(--orange)"></div>sem_full</div>
+            <div class="sem-val" id="svFull" style="color:var(--orange)">0</div>
+          </div>
+          <div class="sem-track"><div class="sem-fill" id="sfFull" style="background:var(--orange);width:0%"></div></div>
+          <div class="sem-desc">items ready to consume</div>
+        </div>
+        <div class="mtx-card" id="mtxCard">
+          <div class="mtx-icon" id="mtxIcon">🔓</div>
+          <div class="mtx-info">
+            <div class="mtx-name">mutex</div>
+            <div class="mtx-status unlocked" id="mtxSt">UNLOCKED</div>
+            <div class="mtx-holder" id="mtxHolder">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONSUMERS -->
+    <div class="threads-col" id="cCol">
+      <div class="col-label c-label">Consumers</div>
+    </div>
+  </div>
+
+  <div class="dlock" id="dlockAlert">⚠ Potential deadlock — all threads blocked on semaphores</div>
+</div>
+
+<!-- RIGHT: SIDEBAR -->
+<div class="sidebar">
+
+  <!-- STATS -->
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-title">Statistics</span>
+      <button class="clear-btn" onclick="clearStats()">clear</button>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-item"><div class="stat-lbl">Produced</div><div class="stat-val sv-p" id="stProd">0</div></div>
+      <div class="stat-item"><div class="stat-lbl">Consumed</div><div class="stat-val sv-c" id="stCons">0</div></div>
+      <div class="stat-item"><div class="stat-lbl">Occupancy</div><div class="stat-val" id="stOcc">0%</div></div>
+      <div class="stat-item"><div class="stat-lbl">Mutex Locks</div><div class="stat-val" id="stLocks">0</div></div>
+      <div class="stat-item"><div class="stat-lbl">Wait Events</div><div class="stat-val" id="stWaits">0</div></div>
+      <div class="stat-item"><div class="stat-lbl">Elapsed</div><div class="stat-val" id="stTime">0s</div></div>
+    </div>
+  </div>
+
+  <!-- ALGORITHM -->
+  <div class="card">
+    <div class="card-hdr"><span class="card-title">Algorithm (Pseudocode)</span></div>
+    <div class="algo-wrap">
+      <div class="algo-block">
+        <div class="algo-title p">Producer Thread</div>
+        <div class="algo-code">
+          <div class="al"><span class="kw">while</span>(true) {</div>
+          <div class="al" id="ap1">&nbsp;&nbsp;produce_item();</div>
+          <div class="al" id="ap2">&nbsp;&nbsp;<span class="fn">wait</span>(sem_empty);</div>
+          <div class="al" id="ap3">&nbsp;&nbsp;<span class="fn">wait</span>(mutex);</div>
+          <div class="al" id="ap4">&nbsp;&nbsp;buffer[in] = item;</div>
+          <div class="al" id="ap5">&nbsp;&nbsp;in = (in+1) % N;</div>
+          <div class="al" id="ap6">&nbsp;&nbsp;<span class="fn">signal</span>(mutex);</div>
+          <div class="al" id="ap7">&nbsp;&nbsp;<span class="fn">signal</span>(sem_full);</div>
+          <div class="al">}</div>
+        </div>
+      </div>
+      <div class="algo-block">
+        <div class="algo-title c">Consumer Thread</div>
+        <div class="algo-code">
+          <div class="al"><span class="kw">while</span>(true) {</div>
+          <div class="al" id="ac1">&nbsp;&nbsp;<span class="fn">wait</span>(sem_full);</div>
+          <div class="al" id="ac2">&nbsp;&nbsp;<span class="fn">wait</span>(mutex);</div>
+          <div class="al" id="ac3">&nbsp;&nbsp;item = buffer[out];</div>
+          <div class="al" id="ac4">&nbsp;&nbsp;out = (out+1) % N;</div>
+          <div class="al" id="ac5">&nbsp;&nbsp;<span class="fn">signal</span>(mutex);</div>
+          <div class="al" id="ac6">&nbsp;&nbsp;<span class="fn">signal</span>(sem_empty);</div>
+          <div class="al" id="ac7">&nbsp;&nbsp;consume_item();</div>
+          <div class="al">}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card">
+    <div class="card-hdr">
+      <span class="card-title">Event Log</span>
+      <button class="clear-btn" onclick="clearLog()">clear</button>
+    </div>
+    <div class="log-body" id="logBody">
+      <div class="log-entry">
+        <span class="lt">00:00</span><span class="la ls">SYS</span>
+        <span class="lm">Ready — press <span class="hi">Start</span> to simulate</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</main>
+
+<script>
+// ====== STATE ======
+let S={
+  running:false,paused:false,tick:0,startTime:null,iid:null,
+  bSize:4,buf:[],inPtr:0,outPtr:0,
+  semE:4,semF:0,mutex:false,mtxHolder:null,
+  producers:[],consumers:[],
+  stats:{prod:0,cons:0,locks:0,waits:0}
+};
+let itemId=0,logCnt=0;
+
+const SPEED=[700,450,270,160,80];
+const getSpd=()=>SPEED[+document.getElementById('spd').value-1];
+
+// ====== INIT ======
+function initSim(){
+  const nP=+document.getElementById('nP').value;
+  const nC=+document.getElementById('nC').value;
+  const bSz=+document.getElementById('bSz').value;
+  S.bSize=bSz;S.buf=new Array(bSz).fill(null);
+  S.inPtr=0;S.outPtr=0;S.semE=bSz;S.semF=0;
+  S.mutex=false;S.mtxHolder=null;S.tick=0;
+  S.stats={prod:0,cons:0,locks:0,waits:0};
+  itemId=0;
+
+  S.producers=Array.from({length:nP},(_,i)=>mkThread(i,'producer','P'+(i+1)));
+  S.consumers=Array.from({length:nC},(_,i)=>mkThread(i,'consumer','C'+(i+1)));
+
+  buildThreadCols();buildBufSlots();
+  refreshSem();refreshMtx();refreshStats();
+  document.getElementById('tickCount').textContent='0';
+  refreshPtrs();
+}
+
+function mkThread(id,type,name){
+  return{id,type,name,state:'IDLE',item:null,delay:0,prog:0,bticks:0};
+}
+
+// ====== DOM BUILD ======
+function buildThreadCols(){
+  const pc=document.getElementById('pCol');
+  const cc=document.getElementById('cCol');
+  const pl=pc.querySelector('.col-label').outerHTML;
+  const cl=cc.querySelector('.col-label').outerHTML;
+  pc.innerHTML=pl;cc.innerHTML=cl;
+  S.producers.forEach(p=>pc.appendChild(tcardEl(p)));
+  S.consumers.forEach(c=>cc.appendChild(tcardEl(c)));
+}
+
+function tcardEl(t){
+  const d=document.createElement('div');
+  d.className=`tc ${t.type}`;d.id=`tc-${t.type}-${t.id}`;
+  d.innerHTML=`<div class="tc-hdr"><span class="tc-name">${t.name}</span>
+    <span class="tc-badge b-idle" id="tb-${t.type}-${t.id}">IDLE</span></div>
+    <div class="tc-step" id="ts-${t.type}-${t.id}">waiting…</div>
+    <div class="tc-prog-wrap"><div class="tc-prog" id="tp-${t.type}-${t.id}"></div></div>`;
+  return d;
+}
+
+function buildBufSlots(){
+  const el=document.getElementById('bufSlots');el.innerHTML='';
+  for(let i=0;i<S.bSize;i++){
+    const s=document.createElement('div');
+    s.className='buf-slot'+(S.buf[i]!==null?' filled':'');
+    s.id='bs-'+i;
+    s.innerHTML=S.buf[i]!==null
+      ?`<span class="slot-val">#${S.buf[i]}</span><span class="slot-idx">[${i}]</span>`
+      :`<span class="slot-idx" style="color:var(--faint)">[${i}] empty</span>`;
+    el.appendChild(s);
+  }
+  refreshPtrs();
+}
+
+function refreshSlot(i){
+  const s=document.getElementById('bs-'+i);if(!s)return;
+  s.className='buf-slot'+(S.buf[i]!==null?' filled':'');
+  s.innerHTML=S.buf[i]!==null
+    ?`<span class="slot-val">#${S.buf[i]}</span><span class="slot-idx">[${i}]</span>`
+    :`<span class="slot-idx" style="color:var(--faint)">[${i}] empty</span>`;
+}
+
+function refreshPtrs(){
+  document.getElementById('ptrs').innerHTML=
+    `<span class="ptr-in">in→${S.inPtr}</span><span class="ptr-out">out→${S.outPtr}</span>`;
+}
+
+function refreshSem(){
+  const mx=S.bSize;
+  document.getElementById('svEmpty').textContent=S.semE;
+  document.getElementById('svFull').textContent=S.semF;
+  document.getElementById('sfEmpty').style.width=((S.semE/mx)*100)+'%';
+  document.getElementById('sfFull').style.width=((S.semF/mx)*100)+'%';
+  document.getElementById('svEmpty').style.color=S.semE===0?'var(--red)':'var(--green)';
+  document.getElementById('svFull').style.color=S.semF===0?'var(--muted)':'var(--orange)';
+}
+
+function refreshMtx(){
+  const c=document.getElementById('mtxCard');
+  const st=document.getElementById('mtxSt');
+  if(S.mutex){
+    c.classList.add('locked');
+    document.getElementById('mtxIcon').textContent='🔒';
+    st.className='mtx-status locked';st.textContent='LOCKED';
+    document.getElementById('mtxHolder').textContent=S.mtxHolder?`held by ${S.mtxHolder}`:'';
+  }else{
+    c.classList.remove('locked');
+    document.getElementById('mtxIcon').textContent='🔓';
+    st.className='mtx-status unlocked';st.textContent='UNLOCKED';
+    document.getElementById('mtxHolder').textContent='—';
+  }
+}
+
+function refreshStats(){
+  document.getElementById('stProd').textContent=S.stats.prod;
+  document.getElementById('stCons').textContent=S.stats.cons;
+  const filled=S.buf.filter(x=>x!==null).length;
+  document.getElementById('stOcc').textContent=Math.round((filled/S.bSize)*100)+'%';
+  document.getElementById('stLocks').textContent=S.stats.locks;
+  document.getElementById('stWaits').textContent=S.stats.waits;
+  if(S.startTime){
+    const el=Math.floor((Date.now()-S.startTime)/1000);
+    document.getElementById('stTime').textContent=el+'s';
+  }
+}
+
+// ====== THREAD CARD UPDATE ======
+function updateTC(t){
+  const card=document.getElementById(`tc-${t.type}-${t.id}`);
+  const badge=document.getElementById(`tb-${t.type}-${t.id}`);
+  const step=document.getElementById(`ts-${t.type}-${t.id}`);
+  const prog=document.getElementById(`tp-${t.type}-${t.id}`);
+  if(!card)return;
+  card.classList.remove('st-wait','st-crit','st-work');
+  badge.className='tc-badge';
+  const s=t.state;
+  if(s==='IDLE'){
+    badge.classList.add('b-idle');badge.textContent='IDLE';
+    step.textContent='idle — waiting to start';prog.style.width='0%';
+  }else if(s==='PRODUCING'){
+    card.classList.add('st-work');badge.classList.add('b-work');badge.textContent='PRODUCING';
+    step.textContent=`produce_item() → #${t.item||'?'}`;prog.style.width=t.prog+'%';
+  }else if(s==='WAIT_E'||s==='WAIT_F'){
+    card.classList.add('st-wait');badge.classList.add('b-wsem');badge.textContent='WAIT';
+    step.textContent=s==='WAIT_E'?'→ wait(sem_empty)…':'→ wait(sem_full)…';prog.style.width='25%';
+  }else if(s==='WAIT_M'){
+    card.classList.add('st-wait');badge.classList.add('b-wmtx');badge.textContent='WAIT MTX';
+    step.textContent='→ wait(mutex)…';prog.style.width='45%';
+  }else if(s==='CRIT'){
+    card.classList.add('st-crit');badge.classList.add('b-crit');badge.textContent='CRITICAL';
+    step.textContent=t.type==='producer'
+      ?`buffer[${(S.inPtr-1+S.bSize)%S.bSize}] = #${t.item}`
+      :`item = buffer[${S.outPtr}] = #${t.item}`;
+    prog.style.width='70%';
+  }else if(s==='SIG'){
+    badge.classList.add('b-done');badge.textContent='SIGNAL';
+    step.textContent=t.type==='producer'?'signal(mutex)+signal(full)':'signal(mutex)+signal(empty)';
+    prog.style.width='90%';
+  }else if(s==='CONSUMING'){
+    card.classList.add('st-work');badge.classList.add('b-work');badge.textContent='CONSUMING';
+    step.textContent=`consume_item(#${t.item})`;prog.style.width=t.prog+'%';
+  }else if(s==='DONE'){
+    badge.classList.add('b-done');badge.textContent='DONE';
+    step.textContent='cycle complete';prog.style.width='100%';
+  }
+}
+
+// ====== ALGO HIGHLIGHT ======
+const P_ALGO={PRODUCING:'ap1',WAIT_E:'ap2',WAIT_M:'ap3',CRIT:'ap4',SIG:'ap6',DONE:'ap7'};
+const C_ALGO={WAIT_F:'ac1',WAIT_M:'ac2',CRIT:'ac3',SIG:'ac5',CONSUMING:'ac7'};
+
+let lastPLine=null,lastCLine=null;
+function highlightAlgo(producers,consumers){
+  // Find any active producer state
+  let pActive=null;
+  producers.forEach(p=>{if(p.state!=='IDLE')pActive=p.state});
+  let cActive=null;
+  consumers.forEach(c=>{if(c.state!=='IDLE')cActive=c.state});
+
+  if(lastPLine){const el=document.getElementById(lastPLine);if(el)el.classList.remove('active');}
+  if(lastCLine){const el=document.getElementById(lastCLine);if(el)el.classList.remove('active');}
+
+  if(pActive&&P_ALGO[pActive]){
+    const el=document.getElementById(P_ALGO[pActive]);
+    if(el){el.classList.add('active');lastPLine=P_ALGO[pActive];}
+  }
+  if(cActive&&C_ALGO[cActive]){
+    const el=document.getElementById(C_ALGO[cActive]);
+    if(el){el.classList.add('active');lastCLine=C_ALGO[cActive];}
+  }
+}
+
+// ====== LOG ======
+function log(actor,cls,msg){
+  const body=document.getElementById('logBody');
+  const el=S.startTime?Math.floor((Date.now()-S.startTime)/1000):0;
+  const mm=String(Math.floor(el/60)).padStart(2,'0');
+  const ss=String(el%60).padStart(2,'0');
+  const div=document.createElement('div');div.className='log-entry';
+  div.innerHTML=`<span class="lt">${mm}:${ss}</span><span class="la ${cls}">${actor}</span><span class="lm">${msg}</span>`;
+  body.appendChild(div);body.scrollTop=body.scrollHeight;
+  if(++logCnt>300){body.removeChild(body.firstChild);logCnt--;}
+}
+function clearLog(){document.getElementById('logBody').innerHTML='';logCnt=0;}
+function clearStats(){S.stats={prod:0,cons:0,locks:0,waits:0};refreshStats();}
+
+// ====== SIMULATION TICK ======
+function tick(){
+  if(S.paused)return;
+  S.tick++;
+  document.getElementById('tickCount').textContent=S.tick;
+  S.producers.forEach(stepProducer);
+  S.consumers.forEach(stepConsumer);
+  // Deadlock check
+  const anyWait=[...S.producers,...S.consumers].some(t=>t.state.startsWith('WAIT'));
+  const allBlocked=[...S.producers,...S.consumers].every(t=>t.state==='IDLE'||t.state.startsWith('WAIT'));
+  document.getElementById('dlockAlert').className='dlock'+(anyWait&&allBlocked?' show':'');
+  // Update all cards
+  [...S.producers,...S.consumers].forEach(t=>updateTC(t));
+  highlightAlgo(S.producers,S.consumers);
+  refreshSem();refreshMtx();refreshStats();refreshPtrs();
+}
+
+function stepProducer(p){
+  if(p.delay>0){p.delay--;return;}
+  switch(p.state){
+    case'IDLE':
+      p.item=++itemId;p.state='PRODUCING';p.prog=0;p.delay=1;break;
+    case'PRODUCING':
+      p.prog=Math.min(p.prog+45,100);
+      if(p.prog>=100){p.state='WAIT_E';p.delay=0;}break;
+    case'WAIT_E':
+      if(S.semE>0){
+        S.semE--;p.state='WAIT_M';S.stats.waits++;
+        log(p.name,'lp',`wait(sem_empty) acquired <span class="v">[empty=${S.semE}]</span>`);
+      }else{
+        if(++p.bticks%6===0)log(p.name,'lp',`wait(sem_empty) <span class="hi">BLOCKED</span> — buffer full`);
+      }break;
+    case'WAIT_M':
+      if(!S.mutex){
+        S.mutex=true;S.mtxHolder=p.name;p.state='CRIT';S.stats.locks++;
+        log(p.name,'lp',`wait(mutex) acquired 🔒`);p.delay=1;
+      }else{
+        if(++p.bticks%6===0)log(p.name,'lp',`wait(mutex) <span class="hi">BLOCKED</span> — held by ${S.mtxHolder}`);
+      }break;
+    case'CRIT':
+      S.buf[S.inPtr]=p.item;
+      const wi=S.inPtr;
+      S.inPtr=(S.inPtr+1)%S.bSize;
+      refreshSlot(wi);
+      const ws=document.getElementById('bs-'+wi);
+      if(ws){ws.classList.add('added');setTimeout(()=>ws.classList.remove('added'),420);}
+      S.mutex=false;S.mtxHolder=null;S.semF++;S.stats.prod++;
+      log(p.name,'lp',`buffer[${wi}]=<span class="v">#${p.item}</span> written · signal(mutex) · signal(full) <span class="v">[full=${S.semF}]</span>`);
+      p.state='SIG';p.delay=1;break;
+    case'SIG':
+      p.state='DONE';p.delay=1;break;
+    case'DONE':
+      p.state='IDLE';p.prog=0;p.bticks=0;p.delay=Math.floor(Math.random()*3);break;
+  }
+}
+
+function stepConsumer(c){
+  if(c.delay>0){c.delay--;return;}
+  switch(c.state){
+    case'IDLE':
+      c.state='WAIT_F';c.delay=Math.floor(Math.random()*3);break;
+    case'WAIT_F':
+      if(S.semF>0){
+        S.semF--;c.state='WAIT_M';S.stats.waits++;
+        log(c.name,'lc',`wait(sem_full) acquired <span class="v">[full=${S.semF}]</span>`);
+      }else{
+        if(++c.bticks%6===0)log(c.name,'lc',`wait(sem_full) <span class="hi">BLOCKED</span> — buffer empty`);
+      }break;
+    case'WAIT_M':
+      if(!S.mutex){
+        S.mutex=true;S.mtxHolder=c.name;c.state='CRIT';S.stats.locks++;
+        log(c.name,'lc',`wait(mutex) acquired 🔒`);c.delay=1;
+      }else{
+        if(++c.bticks%6===0)log(c.name,'lc',`wait(mutex) <span class="hi">BLOCKED</span> — held by ${S.mtxHolder}`);
+      }break;
+    case'CRIT':
+      c.item=S.buf[S.outPtr];
+      const ri=S.outPtr;
+      S.buf[S.outPtr]=null;
+      S.outPtr=(S.outPtr+1)%S.bSize;
+      refreshSlot(ri);
+      const rs=document.getElementById('bs-'+ri);
+      if(rs){rs.classList.add('removed');setTimeout(()=>{rs.classList.remove('removed');refreshSlot(ri);},280);}
+      S.mutex=false;S.mtxHolder=null;S.semE++;
+      log(c.name,'lc',`buffer[${ri}]=<span class="v">#${c.item}</span> read · signal(mutex) · signal(empty) <span class="v">[empty=${S.semE}]</span>`);
+      c.state='SIG';c.delay=1;break;
+    case'SIG':
+      c.state='CONSUMING';c.prog=0;c.delay=1;break;
+    case'CONSUMING':
+      c.prog=Math.min(c.prog+40,100);
+      if(c.prog>=100){S.stats.cons++;
+        log(c.name,'lc',`consume_item(<span class="v">#${c.item}</span>) ✓`);
+        c.state='DONE';c.delay=1;}break;
+    case'DONE':
+      c.state='IDLE';c.prog=0;c.bticks=0;c.delay=Math.floor(Math.random()*2);break;
+  }
+}
+
+// ====== CONTROLS ======
+function setStatus(state){
+  const p=document.getElementById('statusPill');
+  const d=document.getElementById('sdot');
+  const t=document.getElementById('statusTxt');
+  p.className='status-pill status-'+state;
+  t.textContent=state.toUpperCase();
+  d.className='sdot'+(state==='running'?' pulse':'');
+}
+
+function startSim(){
+  if(S.running)return;
+  initSim();S.running=true;S.paused=false;S.startTime=Date.now();
+  document.getElementById('btnStart').disabled=true;
+  document.getElementById('btnPause').disabled=false;
+  ['nP','nC','bSz'].forEach(id=>document.getElementById(id).disabled=true);
+  setStatus('running');
+  log('SYS','ls',`Started — <span class="v">${S.producers.length}P</span>/<span class="v">${S.consumers.length}C</span> buffer=<span class="v">${S.bSize}</span>`);
+  S.iid=setInterval(tick,getSpd());
+  document.getElementById('spd').addEventListener('input',speedChange);
+}
+
+function speedChange(){
+  if(S.running&&S.iid){clearInterval(S.iid);S.iid=setInterval(tick,getSpd());}
+}
+
+function togglePause(){
+  if(!S.running)return;
+  S.paused=!S.paused;
+  const btn=document.getElementById('btnPause');
+  if(S.paused){
+    btn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>Resume`;
+    setStatus('paused');log('SYS','ls','<span class="hi">Paused</span>');
+  }else{
+    btn.innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause`;
+    setStatus('running');log('SYS','ls','<span class="hi">Resumed</span>');
+  }
+}
+
+function resetSim(){
+  if(S.iid)clearInterval(S.iid);
+  S.running=false;S.paused=false;S.iid=null;
+  document.getElementById('btnStart').disabled=false;
+  document.getElementById('btnPause').disabled=true;
+  document.getElementById('btnPause').innerHTML=`<svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Pause`;
+  ['nP','nC','bSz'].forEach(id=>document.getElementById(id).disabled=false);
+  setStatus('stopped');
+  initSim();clearLog();
+  log('SYS','ls','Reset — press <span class="hi">Start</span> to simulate');
+  document.getElementById('dlockAlert').className='dlock';
+  document.getElementById('spd').removeEventListener('input',speedChange);
+  if(lastPLine){const e=document.getElementById(lastPLine);if(e)e.classList.remove('active');lastPLine=null;}
+  if(lastCLine){const e=document.getElementById(lastCLine);if(e)e.classList.remove('active');lastCLine=null;}
+}
+
+// ====== SLIDERS ======
+[['nP','nPv',''],['nC','nCv',''],['bSz','bSzv',''],['spd','spdv','×']].forEach(([id,vid,sfx])=>{
+  document.getElementById(id).addEventListener('input',function(){
+    document.getElementById(vid).textContent=this.value+sfx;
+  });
+});
+
+// ====== THEME ======
+(function(){
+  const t=document.querySelector('[data-theme-toggle]'),r=document.documentElement;
+  let d='dark';r.setAttribute('data-theme',d);
+  t&&t.addEventListener('click',()=>{
+    d=d==='dark'?'light':'dark';r.setAttribute('data-theme',d);
+    t.innerHTML=d==='dark'
+      ?'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>'
+      :'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>';
+  });
+})();
+
+// ====== BOOT ======
+initSim();
+</script>
+</body>
+</html>
